@@ -449,15 +449,11 @@ bool TextService::Exchange(TfEditCookie cookie, ITfContext *context, Json reques
             }
         }
     }
-    // Where the word and the caret are now: the host places its windows there, and draws a word
-    // kept here (`floating_`) at the caret.
-    bool preview = !floating_.empty() && floatingContext_ == context;
-    if (response["ui"].isObject() || preview || previewShown_) {
+    // Where the word and the caret are now: the host places its windows there.
+    if (response["ui"].isObject()) {
         Json place = Json::object();
         place.set("op", "place");
         place.set("rects", Rects(cookie, context));
-        if (preview) place.set("preview", Utf8(floating_));
-        previewShown_ = preview;
         Json ignored;
         host_.Request(place, ignored, 200);
     }
@@ -598,18 +594,30 @@ Json TextService::Snapshot(TfEditCookie cookie, ITfContext *context, bool &maske
     anchor->Release();
     // Text with embedded objects reads shorter than its positions: then the positions don't line up.
     if (static_cast<LONG>(text.size()) != want) out.set("unreadable", true);
-    if (!floating_.empty() && floatingContext_ == context && selStart >= start) {
-        // The word kept here, as if composed at the caret.
-        text = text.substr(0, std::min(text.size(), static_cast<size_t>(selStart - start))) + floating_;
+    if (!floating_.empty() && floatingContext_ == context) {
+        // The word typed into the field, as if composed there, while it is still there right
+        // before the caret. Moved off it, or changed by the app, it is the field's text now.
         LONG length = static_cast<LONG>(floating_.size());
-        Json marked = Json::array();
-        marked.push(static_cast<int>(selStart));
-        marked.push(static_cast<int>(length));
-        out.set("marked", marked);
-        Json caret = Json::array();
-        caret.push(static_cast<int>(selStart + length));
-        caret.push(0);
-        out.set("selection", caret);
+        LONG offset = wordStart_ - start;
+        if (selLength == 0 && wordStart_ + length == selStart && offset >= 0 &&
+            static_cast<LONG>(text.size()) >= offset + length &&
+            text.compare(static_cast<size_t>(offset), static_cast<size_t>(length), floating_) == 0) {
+            Json marked = Json::array();
+            marked.push(static_cast<int>(wordStart_));
+            marked.push(static_cast<int>(length));
+            out.set("marked", marked);
+        } else {
+            // As when an app ends a composition: the session starts afresh, the text stays.
+            // Every key here means the field doesn't keep what went in (positions only, no text).
+            Log("typed word gone: start %ld sel %ld+%ld word %ld+%ld read %zu", static_cast<long>(start),
+                static_cast<long>(selStart), static_cast<long>(selLength), static_cast<long>(wordStart_),
+                static_cast<long>(length), text.size());
+            ClearFloating();
+            Json request = Json::object();
+            request.set("op", "terminated");
+            Json response;
+            host_.Request(request, response, 200);
+        }
     }
     out.set("text", Utf8(text));
     out.set("start", static_cast<int>(start));
@@ -794,7 +802,7 @@ void TextService::ApplyOps(TfEditCookie cookie, ITfContext *context, const Json 
     }
 }
 
-// MARK: The word kept here
+// MARK: The word typed into the field
 
 /// Whether words are kept here rather than composed in the field: in a classic app's context
 /// (CUAS marks it transitory), or an app seen ending compositions at once.
@@ -806,6 +814,7 @@ bool TextService::Floats(ITfContext *context) {
 
 void TextService::ClearFloating() {
     floating_.clear();
+    wordStart_ = 0;
     SafeRelease(floatingContext_);
 }
 
@@ -822,8 +831,9 @@ void TextService::InsertAtCaret(TfEditCookie cookie, ITfContext *context, const 
     insert->Release();
 }
 
-/// One edit where words are kept here: the field holds what went in, `floating_` the word at the
-/// caret. Positions are the session's, which sees the word as composed there (`Snapshot`).
+/// One edit where words are typed into the field: each replaces its range (else the word, else the
+/// selection) in place, and `mark` leaves its text as the word being typed. Positions are the
+/// field's, as `Snapshot` reports the word where it is.
 void TextService::ApplyFloating(TfEditCookie cookie, ITfContext *context, const Json &op) {
     bool mark = op["kind"].asString() == "mark";
     std::wstring text = Wide(op["text"].asString());
@@ -844,44 +854,30 @@ void TextService::ApplyFloating(TfEditCookie cookie, ITfContext *context, const 
         selection.range->Release();
     }
     LONG kept = static_cast<LONG>(floating_.size());
-    if (kept) selected = 0;
-    LONG at = caret, length = kept ? kept : selected;
+    LONG at = kept ? wordStart_ : caret, length = kept ? kept : selected;
     const Json &replace = op["replace"];
     if (replace.isArray() && replace.size() == 2) {
         at = replace[0].asInt();
         length = replace[1].asInt();
     }
-    // The part in the field (the word just committed, switched again; a selection typed over).
-    LONG fieldEnd = caret + selected;
-    if (at < fieldEnd) {
-        LONG inField = std::min(at + length, fieldEnd) - at;
-        ITfRange *range = RangeAt(cookie, context, at, inField);
-        bool whollyInField = at + length <= fieldEnd && !kept;
-        if (range) {
-            // An edit of what went in already, outside the word: made in the field.
-            range->SetText(cookie, 0, whollyInField && !mark ? text.c_str() : L"",
-                           whollyInField && !mark ? static_cast<LONG>(text.size()) : 0);
-            MoveCaretToEnd(cookie, context, range);
-            range->Release();
-        }
-        if (whollyInField && !mark) return;
-        length -= inField;
-        at = std::min(at + inField, caret);
-        caret = at;
+    // ponytail: a field without character positions can't be rewritten in place; there the word
+    // shows only when it goes in (the marks are skipped), where the old build drew it at the caret.
+    ITfRange *range = RangeAt(cookie, context, at, length);
+    if (range) {
+        range->SetText(cookie, 0, text.c_str(), static_cast<LONG>(text.size()));
+        MoveCaretToEnd(cookie, context, range);
+        range->Release();
+    } else if (!mark && !kept) {
+        InsertAtCaret(cookie, context, text);
+    } else if (Verbose()) {
+        Log("no position to type the word at");
     }
-    // The part in the word kept here.
-    LONG offset = std::max(0L, std::min(at - caret, kept));
-    LONG covered = std::max(0L, std::min(length, kept - offset));
-    std::wstring before = floating_.substr(0, static_cast<size_t>(offset));
-    std::wstring after = floating_.substr(static_cast<size_t>(offset + covered));
-    if (mark) {
-        InsertAtCaret(cookie, context, before); // what the new word leaves before it went in
+    if (range && mark && !text.empty()) {
         floating_ = text;
+        wordStart_ = at;
     } else {
-        floating_.clear();
-        InsertAtCaret(cookie, context, before + text + after);
+        ClearFloating();
     }
-    if (floating_.empty()) ClearFloating();
 }
 
 /// The word being typed underlined; a phrase being converted as its reading (thin), with the clause

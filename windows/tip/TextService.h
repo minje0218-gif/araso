@@ -98,11 +98,12 @@ private:
     bool keptDown_[256] = {};
 
     /// Classic apps (IMM32, through Windows' compatibility layer, CUAS) end a Korean input method's
-    /// composition as soon as it starts. There the word being typed is kept here, shown to the
-    /// session as if composed at the caret and drawn there by the host, and goes in whole.
+    /// composition as soon as it starts. There the word being typed goes into the field as it is
+    /// typed, at `wordStart_`, and is rewritten in place while its reading changes; it is shown to
+    /// the session as composed there for as long as the field still has it before the caret.
     std::wstring floating_;
     ITfContext *floatingContext_ = nullptr;
-    bool previewShown_ = false;
+    LONG wordStart_ = 0;
     /// An app was seen ending a composition at once, where its context didn't say it would.
     bool appEndsCompositions_ = false;
     DWORD compositionStartedAt_ = 0;
