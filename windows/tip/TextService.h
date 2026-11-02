@@ -98,19 +98,22 @@ private:
     bool keptDown_[256] = {};
 
     /// Classic apps (IMM32, through Windows' compatibility layer, CUAS) end a Korean input method's
-    /// composition as soon as it starts. There the word being typed goes into the field as it is
-    /// typed, at `wordStart_`, and is rewritten in place while its reading changes; it is shown to
-    /// the session as composed there for as long as the field still has it before the caret.
+    /// composition as soon as it starts. There the word being typed is kept here, shown to the
+    /// session as if composed at the caret, and typed into the app as it changes (`Retype`):
+    /// the field doesn't keep what the input method puts in while keys come quickly.
     std::wstring floating_;
     ITfContext *floatingContext_ = nullptr;
-    LONG wordStart_ = 0;
+    /// Tells of clicks in this thread's windows: a click moves the caret off the word typed.
+    HHOOK mouseHook_ = nullptr;
     /// An app was seen ending a composition at once, where its context didn't say it would.
     bool appEndsCompositions_ = false;
     DWORD compositionStartedAt_ = 0;
     bool Floats(ITfContext *context);
     void ApplyFloating(TfEditCookie cookie, ITfContext *context, const Json &op);
     void InsertAtCaret(TfEditCookie cookie, ITfContext *context, const std::wstring &text);
+    void Retype(const std::wstring &from, const std::wstring &to);
     void ClearFloating();
+    void LeaveFloating();
 
     bool Takes(WPARAM wParam, bool down) const;
     bool HostTakes(WPARAM wParam, LPARAM lParam, bool up);

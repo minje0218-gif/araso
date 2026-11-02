@@ -59,6 +59,21 @@ Json RectJson(const RECT &rect) {
     return out;
 }
 
+/// A mouse button went down in this thread's windows since the word being typed started.
+thread_local bool t_clicked = false;
+
+LRESULT CALLBACK MouseHook(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION) {
+        switch (wParam) {
+        case WM_LBUTTONDOWN: case WM_RBUTTONDOWN: case WM_MBUTTONDOWN: case WM_XBUTTONDOWN:
+        case WM_NCLBUTTONDOWN: case WM_NCRBUTTONDOWN: case WM_NCMBUTTONDOWN: case WM_NCXBUTTONDOWN:
+            t_clicked = true;
+            break;
+        }
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
 template <typename T> void SafeRelease(T *&pointer) {
     if (pointer) {
         pointer->Release();
@@ -161,14 +176,17 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr *threadMgr, TfClientId clientI
         compartments->Release();
     }
     host_.Attach(app_, window_);
+    mouseHook_ = SetWindowsHookExW(WH_MOUSE, MouseHook, nullptr, GetCurrentThreadId());
     Log("activated in %s", Utf8(app_).c_str());
     return S_OK;
 }
 
 STDMETHODIMP TextService::Deactivate() {
     if (composition_ && compositionContext_) CommitIn(compositionContext_, "blur");
-    else if (!floating_.empty() && floatingContext_) CommitIn(floatingContext_, "blur");
+    else if (!floating_.empty()) LeaveFloating();
     host_.Detach();
+    if (mouseHook_) UnhookWindowsHookEx(mouseHook_);
+    mouseHook_ = nullptr;
     if (button_) {
         ITfLangBarItemMgr *items = nullptr;
         if (threadMgr_ && SUCCEEDED(threadMgr_->QueryInterface(kIID_ITfLangBarItemMgr, reinterpret_cast<void **>(&items)))) {
@@ -207,9 +225,10 @@ STDMETHODIMP TextService::Deactivate() {
 STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *focus, ITfDocumentMgr *previous) {
     if (focus == previous) return S_OK; // the same field again
     Log("focus moved in %s (%s)", Utf8(app_).c_str(), composition_ ? "while composing" : "idle");
-    // What was being typed in the last field goes in there, as shown.
+    // What was being typed in the last field goes in there, as shown (a word typed into the app
+    // already is there).
     if (composition_ && compositionContext_) CommitIn(compositionContext_, "blur");
-    else if (!floating_.empty() && floatingContext_) CommitIn(floatingContext_, "blur");
+    else if (!floating_.empty()) LeaveFloating();
     if (!focus) return S_OK;
     Json request = Json::object();
     request.set("op", "focus");
@@ -594,30 +613,20 @@ Json TextService::Snapshot(TfEditCookie cookie, ITfContext *context, bool &maske
     anchor->Release();
     // Text with embedded objects reads shorter than its positions: then the positions don't line up.
     if (static_cast<LONG>(text.size()) != want) out.set("unreadable", true);
-    if (!floating_.empty() && floatingContext_ == context) {
-        // The word typed into the field, as if composed there, while it is still there right
-        // before the caret. Moved off it, or changed by the app, it is the field's text now.
+    // A click since the word was typed in may have moved the caret off it: it stays as it is.
+    if (!floating_.empty() && t_clicked) LeaveFloating();
+    if (!floating_.empty() && floatingContext_ == context && selStart >= start) {
+        // The word kept here, as if composed at the caret.
+        text = text.substr(0, std::min(text.size(), static_cast<size_t>(selStart - start))) + floating_;
         LONG length = static_cast<LONG>(floating_.size());
-        LONG offset = wordStart_ - start;
-        if (selLength == 0 && wordStart_ + length == selStart && offset >= 0 &&
-            static_cast<LONG>(text.size()) >= offset + length &&
-            text.compare(static_cast<size_t>(offset), static_cast<size_t>(length), floating_) == 0) {
-            Json marked = Json::array();
-            marked.push(static_cast<int>(wordStart_));
-            marked.push(static_cast<int>(length));
-            out.set("marked", marked);
-        } else {
-            // As when an app ends a composition: the session starts afresh, the text stays.
-            // Every key here means the field doesn't keep what went in (positions only, no text).
-            Log("typed word gone: start %ld sel %ld+%ld word %ld+%ld read %zu", static_cast<long>(start),
-                static_cast<long>(selStart), static_cast<long>(selLength), static_cast<long>(wordStart_),
-                static_cast<long>(length), text.size());
-            ClearFloating();
-            Json request = Json::object();
-            request.set("op", "terminated");
-            Json response;
-            host_.Request(request, response, 200);
-        }
+        Json marked = Json::array();
+        marked.push(static_cast<int>(selStart));
+        marked.push(static_cast<int>(length));
+        out.set("marked", marked);
+        Json caret = Json::array();
+        caret.push(static_cast<int>(selStart + length));
+        caret.push(0);
+        out.set("selection", caret);
     }
     out.set("text", Utf8(text));
     out.set("start", static_cast<int>(start));
@@ -802,7 +811,7 @@ void TextService::ApplyOps(TfEditCookie cookie, ITfContext *context, const Json 
     }
 }
 
-// MARK: The word typed into the field
+// MARK: The word kept here
 
 /// Whether words are kept here rather than composed in the field: in a classic app's context
 /// (CUAS marks it transitory), or an app seen ending compositions at once.
@@ -814,7 +823,6 @@ bool TextService::Floats(ITfContext *context) {
 
 void TextService::ClearFloating() {
     floating_.clear();
-    wordStart_ = 0;
     SafeRelease(floatingContext_);
 }
 
@@ -831,9 +839,8 @@ void TextService::InsertAtCaret(TfEditCookie cookie, ITfContext *context, const 
     insert->Release();
 }
 
-/// One edit where words are typed into the field: each replaces its range (else the word, else the
-/// selection) in place, and `mark` leaves its text as the word being typed. Positions are the
-/// field's, as `Snapshot` reports the word where it is.
+/// One edit where words are kept here: the field holds what went in, `floating_` the word at the
+/// caret. Positions are the session's, which sees the word as composed there (`Snapshot`).
 void TextService::ApplyFloating(TfEditCookie cookie, ITfContext *context, const Json &op) {
     bool mark = op["kind"].asString() == "mark";
     std::wstring text = Wide(op["text"].asString());
@@ -854,33 +861,98 @@ void TextService::ApplyFloating(TfEditCookie cookie, ITfContext *context, const 
         selection.range->Release();
     }
     LONG kept = static_cast<LONG>(floating_.size());
-    LONG at = kept ? wordStart_ : caret, length = kept ? kept : selected;
+    if (kept) selected = 0;
+    LONG at = caret, length = kept ? kept : selected;
     const Json &replace = op["replace"];
     if (replace.isArray() && replace.size() == 2) {
         at = replace[0].asInt();
         length = replace[1].asInt();
     }
-    // ponytail: a field without character positions can't be rewritten in place; there the word
-    // shows only when it goes in (the marks are skipped), where the old build drew it at the caret.
-    ITfRange *range = RangeAt(cookie, context, at, length);
-    if (range) {
-        // Cleared, then put in at the selection: the compatibility layer keeps text put in that
-        // way (a word just committed can be switched), not text set into an empty range.
-        if (length > 0) range->SetText(cookie, 0, L"", 0);
-        MoveCaretToEnd(cookie, context, range);
-        range->Release();
-        InsertAtCaret(cookie, context, text);
-    } else if (!mark && !kept) {
-        InsertAtCaret(cookie, context, text);
-    } else if (Verbose()) {
-        Log("no position to type the word at");
+    // The part in the field (the word just committed, switched again; a selection typed over).
+    LONG fieldEnd = caret + selected;
+    if (at < fieldEnd) {
+        LONG inField = std::min(at + length, fieldEnd) - at;
+        ITfRange *range = RangeAt(cookie, context, at, inField);
+        bool whollyInField = at + length <= fieldEnd && !kept;
+        if (range) {
+            // An edit of what went in already, outside the word: made in the field.
+            range->SetText(cookie, 0, whollyInField && !mark ? text.c_str() : L"",
+                           whollyInField && !mark ? static_cast<LONG>(text.size()) : 0);
+            MoveCaretToEnd(cookie, context, range);
+            range->Release();
+        }
+        if (whollyInField && !mark) return;
+        length -= inField;
+        at = std::min(at + inField, caret);
+        caret = at;
     }
-    if (range && mark && !text.empty()) {
+    // The part in the word kept here.
+    LONG offset = std::max(0L, std::min(at - caret, kept));
+    LONG covered = std::max(0L, std::min(length, kept - offset));
+    std::wstring before = floating_.substr(0, static_cast<size_t>(offset));
+    std::wstring after = floating_.substr(static_cast<size_t>(offset + covered));
+    // The app has the word as it was (`floating_`) before its caret: typed over to what goes in
+    // now and, for `mark`, the new word (what it leaves before it is in for good).
+    std::wstring shown = floating_;
+    if (shown.empty()) t_clicked = false; // a new word, at the caret
+    if (mark) {
         floating_ = text;
-        wordStart_ = at;
+        Retype(shown, before + text);
     } else {
-        ClearFloating();
+        floating_.clear();
+        Retype(shown, before + text + after);
     }
+    if (floating_.empty()) ClearFloating();
+}
+
+/// Types `to` in place of `from`, which the app has right before its caret: back to where they
+/// part, then the rest. All as typed characters, a Backspace too (0x08), so they reach the app in
+/// order with the keys sent again (`Replay`) and pass this text service by (`VK_PACKET`).
+void TextService::Retype(const std::wstring &from, const std::wstring &to) {
+    size_t same = 0;
+    while (same < from.size() && same < to.size() && from[same] == to[same]) same++;
+    if (same > 0 && IS_HIGH_SURROGATE(from[same - 1])) same--; // never half a character
+    if (same == from.size() && same == to.size()) return;
+    // Only into this thread's window: keys sent after the focus moved on would go elsewhere.
+    HWND front = GetForegroundWindow();
+    if (!front || GetWindowThreadProcessId(front, nullptr) != GetCurrentThreadId()) {
+        Log("not typed: the window in front is another thread's");
+        return;
+    }
+    std::vector<INPUT> inputs;
+    auto type = [&inputs](wchar_t unit) {
+        INPUT input = {};
+        input.type = INPUT_KEYBOARD;
+        input.ki.wScan = unit;
+        input.ki.dwFlags = KEYEVENTF_UNICODE;
+        inputs.push_back(input);
+        input.ki.dwFlags |= KEYEVENTF_KEYUP;
+        inputs.push_back(input);
+    };
+    size_t back = 0;
+    // ponytail: one Backspace per character, a surrogate pair as one; an app that deletes half a
+    // pair would need one per unit.
+    for (size_t i = same; i < from.size(); i++) {
+        if (!IS_LOW_SURROGATE(from[i])) back++;
+    }
+    for (size_t i = 0; i < back; i++) type(L'\b');
+    for (size_t i = same; i < to.size(); i++) type(to[i]);
+    UINT sent = SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    if (Verbose() || sent != inputs.size()) {
+        Log("typed over: %zu back, %zu in, %u of %zu sent", back, to.size() - same, sent, inputs.size());
+    }
+}
+
+/// The word typed into the app stays there as it is, and the session starts afresh, as when an
+/// app ends a composition.
+void TextService::LeaveFloating() {
+    ClearFloating();
+    t_clicked = false;
+    Log("the word typed in was left as it is");
+    Json request = Json::object();
+    request.set("op", "terminated");
+    Json response;
+    host_.Request(request, response, 200);
 }
 
 /// The word being typed underlined; a phrase being converted as its reading (thin), with the clause
