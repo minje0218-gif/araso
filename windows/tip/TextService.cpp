@@ -801,7 +801,17 @@ void TextService::ApplyOps(TfEditCookie cookie, ITfContext *context, const Json 
 bool TextService::Floats(ITfContext *context) {
     if (appEndsCompositions_) return true;
     TF_STATUS status = {};
-    return SUCCEEDED(context->GetStatus(&status)) && (status.dwStaticFlags & TF_SS_TRANSITORY);
+    if (FAILED(context->GetStatus(&status)) || !(status.dwStaticFlags & TF_SS_TRANSITORY)) return false;
+    // Chromium (Chrome, Edge, Electron apps) marks its own text store transitory too, but keeps a
+    // whole word composed in the text, as Japanese input methods' phrases are there.
+    ITfContextView *view = nullptr;
+    HWND window = nullptr;
+    if (SUCCEEDED(context->GetActiveView(&view)) && view) {
+        view->GetWnd(&window);
+        view->Release();
+    }
+    wchar_t name[32] = L"";
+    return !(window && GetClassNameW(window, name, 32) && wcsncmp(name, L"Chrome_", 7) == 0);
 }
 
 void TextService::ClearFloating() {
