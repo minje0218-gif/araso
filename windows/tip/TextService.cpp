@@ -864,9 +864,12 @@ void TextService::ApplyFloating(TfEditCookie cookie, ITfContext *context, const 
     // shows only when it goes in (the marks are skipped), where the old build drew it at the caret.
     ITfRange *range = RangeAt(cookie, context, at, length);
     if (range) {
-        range->SetText(cookie, 0, text.c_str(), static_cast<LONG>(text.size()));
+        // Cleared, then put in at the selection: the compatibility layer keeps text put in that
+        // way (a word just committed can be switched), not text set into an empty range.
+        if (length > 0) range->SetText(cookie, 0, L"", 0);
         MoveCaretToEnd(cookie, context, range);
         range->Release();
+        InsertAtCaret(cookie, context, text);
     } else if (!mark && !kept) {
         InsertAtCaret(cookie, context, text);
     } else if (Verbose()) {
