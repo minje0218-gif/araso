@@ -129,7 +129,8 @@ public final class ServiceRuntime {
         let session = InputSession(engine: engine, policies: AppPolicies.load(),
                                    converter: settings.japanese ? converter : nil,
                                    japaneseEnabled: settings.japanese, liveConversion: settings.liveConversion,
-                                   returnConfirmsOnly: settings.returnConfirmsOnly)
+                                   // Hanyeong: Return puts the word in and goes to the app too.
+                                   returnConfirmsOnly: false)
         session.replacements = replacements.entries
         session.fullWidthDigits = settings.fullWidthDigits
         session.fullWidthSpace = settings.fullWidthSpace
