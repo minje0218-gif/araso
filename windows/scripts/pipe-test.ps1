@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $server = Start-Process -FilePath (Join-Path $Stage "ArasoHost.exe") -ArgumentList "--server" -PassThru
 try {
-    $name = "Araso.$((Get-Process -Id $PID).SessionId).$env:USERNAME"
+    $name = "Hanyeong.$((Get-Process -Id $PID).SessionId).$env:USERNAME"
     $pipe = New-Object System.IO.Pipes.NamedPipeClientStream(".", $name, [System.IO.Pipes.PipeDirection]::InOut)
     # The host warms its models up before it serves.
     $pipe.Connect(60000)
