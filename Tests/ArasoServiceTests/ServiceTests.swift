@@ -478,7 +478,7 @@ final class Harness {
         #expect(release?.notes.first?.title == "새 기능")
         #expect(h.runtime.model().update?.version == "9.0.0")
         let menu = h.send(ServiceRequest(op: .menu, client: h.client)).reply.menu ?? []
-        #expect(menu.contains { $0.id == "update" })
+        #expect(!menu.contains { $0.id == "update" }) // this build offers no updates
     }
 
     @Test func tryTypingTraceOnlyInTheHostsOwnField() throws {
