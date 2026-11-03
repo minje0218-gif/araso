@@ -106,6 +106,10 @@ constexpr GUID kIID_ITfCategoryMgr = {0xc3acefb5, 0xf69d, 0x4905, {0x93, 0x8f, 0
 // Araso's own.
 constexpr GUID kClsidTextService = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41, 0x72, 0x61, 0x73, 0x6f, 0x01}};
 constexpr GUID kGuidProfile = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41, 0x72, 0x61, 0x73, 0x6f, 0x02}};
+/// The same input method listed under Japanese and English as well: Windows' compatibility layer
+/// for classic apps keeps a Korean input method to one syllable at a time, not these.
+constexpr GUID kGuidProfileJapanese = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41, 0x72, 0x61, 0x73, 0x6f, 0x04}};
+constexpr GUID kGuidProfileEnglish = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41, 0x72, 0x61, 0x73, 0x6f, 0x05}};
 constexpr GUID kGuidLangBarButton = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41, 0x72, 0x61, 0x73, 0x6f, 0x03}};
 /// The word being typed (a dotted underline), the reading being converted (thin) and the clause
 /// the candidates are for (thick), as macOS draws marked text and its clauses.
@@ -119,6 +123,16 @@ constexpr GUID kGuidAttrTarget = {0x6d6c7d5f, 0x3b7f, 0x4f0e, {0x9a, 0x2c, 0x41,
 #endif
 
 constexpr LANGID kLangId = MAKELANGID(LANG_KOREAN, SUBLANG_KOREAN);
+
+struct Profile {
+    LANGID langid;
+    const GUID *guid;
+};
+constexpr Profile kProfiles[] = {
+    {kLangId, &kGuidProfile},
+    {MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN), &kGuidProfileJapanese},
+    {MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), &kGuidProfileEnglish},
+};
 
 extern HINSTANCE g_instance;
 extern LONG g_references;

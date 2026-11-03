@@ -340,6 +340,24 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Shot "settings-typing" $f.window
     Stop-Process -Id $f.process.Id -Force
     Remove-Item $settings -ErrorAction SilentlyContinue
+    Get-Process ArasoHost -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Process -FilePath "$folder\ArasoHost.exe" -ArgumentList "--server"
+    Start-Sleep -Seconds 8
+
+    # Reported, not required: Araso listed under Japanese and English, where a classic app may keep
+    # a whole word composed in the text (it keeps a Korean input method to one syllable at a time).
+    foreach ($other in @(@("0411", "04"), @("0409", "05"))) {
+        $otherTip = "$($other[0]):{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}{6D6C7D5F-3B7F-4F0E-9A2C-417261736F$($other[1])}"
+        [Keys]::InstallLayoutOrTip($otherTip, 0) | Out-Null
+        Set-WinDefaultInputMethodOverride -InputTip $otherTip
+        $script:language = $other[0]
+        Case "dkssud hello " "안녕 hello " $null $classic | Out-Null
+        Case "gksrmf " "한글 " $null $classic | Out-Null
+        $f = Kept $classic
+        Send-Keys "gksrmf dkssud"; Start-Sleep -Milliseconds 700
+        Shot "8-classic-app-$($other[0])-composing" $f.window 40
+        Stop-Process -Id $f.process.Id -Force
+    }
 }
 
 if (Test-Path $log) { Write-Host "--- araso.log"; Get-Content $log | Select-String -NotMatch "scan code" | Select-Object -Last 400 | Out-Host }

@@ -117,8 +117,12 @@ bool RegisterProfile() {
                                   kIID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&profiles));
     if (FAILED(hr)) return false;
     // The icon is the first in the DLL (index 0).
-    hr = profiles->RegisterProfile(kClsidTextService, kLangId, kGuidProfile, name.c_str(), static_cast<ULONG>(name.size()),
-                                   icon.c_str(), static_cast<ULONG>(icon.size()), 0, nullptr, 0, TRUE, 0);
+    for (const Profile &profile : kProfiles) {
+        hr = profiles->RegisterProfile(kClsidTextService, profile.langid, *profile.guid, name.c_str(),
+                                       static_cast<ULONG>(name.size()), icon.c_str(), static_cast<ULONG>(icon.size()), 0,
+                                       nullptr, 0, TRUE, 0);
+        if (FAILED(hr)) break;
+    }
     profiles->Release();
     return SUCCEEDED(hr);
 }
@@ -127,7 +131,7 @@ void UnregisterProfile() {
     ITfInputProcessorProfileMgr *profiles = nullptr;
     if (SUCCEEDED(CoCreateInstance(kClsidTfInputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER,
                                    kIID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&profiles)))) {
-        profiles->UnregisterProfile(kClsidTextService, kLangId, kGuidProfile, 0);
+        for (const Profile &profile : kProfiles) profiles->UnregisterProfile(kClsidTextService, profile.langid, *profile.guid, 0);
         profiles->Release();
     }
 }

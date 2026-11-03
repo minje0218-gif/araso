@@ -802,6 +802,8 @@ bool TextService::Floats(ITfContext *context) {
     if (appEndsCompositions_) return true;
     TF_STATUS status = {};
     if (FAILED(context->GetStatus(&status)) || !(status.dwStaticFlags & TF_SS_TRANSITORY)) return false;
+    // Only Korean is kept to a syllable at a time there (Araso listed under another language).
+    if (PRIMARYLANGID(LOWORD(reinterpret_cast<UINT_PTR>(GetKeyboardLayout(0)))) != LANG_KOREAN) return false;
     // Chromium (Chrome, Edge, Electron apps) marks its own text store transitory too, but keeps a
     // whole word composed in the text, as Japanese input methods' phrases are there.
     ITfContextView *view = nullptr;
