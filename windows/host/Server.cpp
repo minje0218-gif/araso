@@ -108,7 +108,7 @@ int Server::Run() {
     std::wstring error;
     if (!Bridge::Shared().Start(error)) {
         Log("%s", Utf8(error).c_str());
-        MessageBoxW(nullptr, error.c_str(), L"Araso", MB_ICONERROR);
+        MessageBoxW(nullptr, error.c_str(), L"Hanyeong", MB_ICONERROR);
         return 1;
     }
 
@@ -117,7 +117,7 @@ int Server::Run() {
     cls.hInstance = GetModuleHandleW(nullptr);
     cls.lpszClassName = kHostWindowClass;
     RegisterClassExW(&cls);
-    window_ = CreateWindowExW(WS_EX_TOOLWINDOW, kHostWindowClass, L"Araso", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
+    window_ = CreateWindowExW(WS_EX_TOOLWINDOW, kHostWindowClass, L"Hanyeong", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
                               GetModuleHandleW(nullptr), nullptr);
     if (!window_) return 1;
     // The settings window and `--vim` may run at another integrity level.
@@ -128,8 +128,7 @@ int Server::Run() {
     // them would time out and go to the app as typed.
     Bridge::Shared().WarmUp();
     CloseHandle(CreateThread(nullptr, 0, Listen, this, 0, nullptr));
-    // The first update check a minute after starting, then hourly wake-ups that check once a day.
-    SetTimer(window_, kUpdateTimer, 60 * 1000, nullptr);
+    // No update checks: this build isn't one of Araso's releases.
     Log("host ready");
 
     MSG message;

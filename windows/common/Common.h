@@ -18,19 +18,19 @@ std::wstring Wide(const std::string &utf8);
 std::string Utf8(const std::wstring &wide);
 std::string Utf8(const wchar_t *wide, size_t length);
 
-/// The host's pipe, one per user session: `\\.\pipe\Araso.<session>.<user>`.
+/// The host's pipe, one per user session: `\\.\pipe\Hanyeong.<session>.<user>`.
 std::wstring PipeName();
 
 /// The window message the host posts to a text service's message-only window when it has edits
 /// waiting for it (a click in the candidate window, a vim mode change), and the host's own
 /// window class, which the settings window finds to say the files changed.
-constexpr const wchar_t *kPendingMessage = L"Araso.Pending";
-constexpr const wchar_t *kHostWindowClass = L"ArasoHostWindow";
-constexpr const wchar_t *kSettingsWindowClass = L"ArasoSettingsWindow";
-constexpr const wchar_t *kHostMutex = L"Local\\Araso.Host";
+constexpr const wchar_t *kPendingMessage = L"Hanyeong.Pending";
+constexpr const wchar_t *kHostWindowClass = L"HanyeongHostWindow";
+constexpr const wchar_t *kSettingsWindowClass = L"HanyeongSettingsWindow";
+constexpr const wchar_t *kHostMutex = L"Local\\Hanyeong.Host";
 /// Posted by the text service in the settings window's process with a trace for Try Typing
 /// (lParam: JSON in a block of the process heap, which the window frees).
-constexpr const wchar_t *kTraceMessage = L"Araso.Trace";
+constexpr const wchar_t *kTraceMessage = L"Hanyeong.Trace";
 
 /// WM_COPYDATA kinds between the host and the settings window.
 enum CopyDataKind : ULONG_PTR {

@@ -488,9 +488,6 @@ public final class ServiceRuntime {
             if listed { add("app.remove", L("Use Default Settings in This App"), indent: 1) }
             items.append(.line)
         }
-        add("japanese", L("Japanese Input"), on: settings.japanese)
-        add("live", L("Live Conversion"), on: settings.liveConversion, enabled: settings.japanese, indent: 1)
-        items.append(.line)
         if let keys = engine.lastLearned { add("undo", L("Undo Last Learned (%@)", keys)) }
         // What the dictionary decided lately, to tell whether a word went in because of it and forget it.
         let applied = engine.recentlyApplied
@@ -500,12 +497,6 @@ public final class ServiceRuntime {
                 add("forget:" + word.keys, L("%@ → %@ · Forget", word.text, Self.languageName(word.language)), indent: 1)
             }
         }
-        if settings.checkForUpdates, let release = UpdateStore.available(current: configuration.version) {
-            add("update", L("Update to Araso %@…", release.version))
-        }
-        add("typing", L("Try Typing…"))
-        add("learning", L("Dictionary…"))
-        add("settings", L("Araso Settings…"))
         return items
     }
 

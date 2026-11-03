@@ -365,8 +365,9 @@ final class Harness {
         let ids = menu.compactMap(\.id)
         #expect(ids.contains("pause"))
         #expect(ids.contains("app.strict"))
-        #expect(ids.contains("japanese"))
-        #expect(ids.contains("settings"))
+        // This build has no Japanese and no settings window.
+        #expect(!ids.contains("japanese"))
+        #expect(!ids.contains("settings"))
         #expect(menu.contains { $0.title.contains("notepad.exe") })
         var select = ServiceRequest(op: .menuSelect, client: h.client)
         select.item = "app.strict"

@@ -51,7 +51,7 @@ STDMETHODIMP LangBarButton::GetInfo(TF_LANGBARITEMINFO *info) {
     info->guidItem = kGuidLbiInputMode;
     info->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_SHOWNINTRAY;
     info->ulSort = 0;
-    lstrcpynW(info->szDescription, L"Araso", TF_LBI_DESC_MAXLEN);
+    lstrcpynW(info->szDescription, L"Hanyeong", TF_LBI_DESC_MAXLEN);
     return S_OK;
 }
 
@@ -63,13 +63,13 @@ STDMETHODIMP LangBarButton::GetStatus(DWORD *status) {
 
 STDMETHODIMP LangBarButton::GetTooltipString(BSTR *tooltip) {
     if (!tooltip) return E_INVALIDARG;
-    *tooltip = SysAllocString(L"Araso");
+    *tooltip = SysAllocString(L"Hanyeong");
     return *tooltip ? S_OK : E_OUTOFMEMORY;
 }
 
 STDMETHODIMP LangBarButton::GetText(BSTR *text) {
     if (!text) return E_INVALIDARG;
-    *text = SysAllocString(L"Araso");
+    *text = SysAllocString(L"Hanyeong");
     return *text ? S_OK : E_OUTOFMEMORY;
 }
 

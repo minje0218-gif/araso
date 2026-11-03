@@ -31,7 +31,7 @@ std::wstring Bridge::SupportFolder() {
     std::wstring folder;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming))) folder = roaming;
     CoTaskMemFree(roaming);
-    return folder + L"\\Araso";
+    return folder + L"\\Hanyeong";
 }
 
 std::string Bridge::Version() { return ARASO_VERSION_STRING; }

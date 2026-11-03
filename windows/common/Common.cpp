@@ -30,7 +30,7 @@ std::wstring PipeName() {
     wchar_t user[257] = L"";
     DWORD size = 257;
     if (!GetUserNameW(user, &size)) lstrcpyW(user, L"user");
-    return L"\\\\.\\pipe\\Araso." + std::to_wstring(session) + L"." + user;
+    return L"\\\\.\\pipe\\Hanyeong." + std::to_wstring(session) + L"." + user;
 }
 
 namespace {

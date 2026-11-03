@@ -74,8 +74,8 @@ int Register(bool add) {
     HMODULE input = LoadLibraryW(L"input.dll");
     auto install = input ? reinterpret_cast<InstallFn>(GetProcAddress(input, "InstallLayoutOrTip")) : nullptr;
     if (!install) return 1;
-    // 0412 (Korean), the text service's CLSID and its profile (windows/tip/Tsf.h).
-    const wchar_t *profile = L"0412:{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}{6D6C7D5F-3B7F-4F0E-9A2C-417261736F02}";
+    // 0409 (English, US), the text service's CLSID and its profile (windows/tip/Tsf.h).
+    const wchar_t *profile = L"0409:{8B4F5812-54E9-4A07-887F-51BB2264B601}{8B4F5812-54E9-4A07-887F-51BB2264B602}";
     BOOL ok = install(profile, add ? 0 : 1 /* ILOT_UNINSTALL */);
     FreeLibrary(input);
     return ok ? 0 : 1;
@@ -122,7 +122,7 @@ int SelfTest() {
 int LoadTextService() {
     HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     CLSID clsid = {};
-    CLSIDFromString(L"{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}", &clsid);
+    CLSIDFromString(L"{8B4F5812-54E9-4A07-887F-51BB2264B601}", &clsid);
     IUnknown *service = nullptr;
     HRESULT hr = CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER, IID_IUnknown, reinterpret_cast<void **>(&service));
     std::string line = "text service: ";

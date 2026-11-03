@@ -92,8 +92,8 @@ public static class Keys {
 }
 "@
 
-$script:language = "0412"
-$tip = "0412:{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}{6D6C7D5F-3B7F-4F0E-9A2C-417261736F02}"
+$script:language = "0409"
+$tip = "0409:{8B4F5812-54E9-4A07-887F-51BB2264B601}{8B4F5812-54E9-4A07-887F-51BB2264B602}"
 # Only the installer is waited for: -Wait would also wait for the host it starts, which stays.
 # (Not $installer: PowerShell's names ignore case, and the [string] parameter would take the process.)
 $setup = Start-Process -FilePath $Installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
@@ -119,7 +119,7 @@ $x64 = (Get-Content $log -ErrorAction SilentlyContinue | Select-String "text ser
 Write-Host "x64 process: $x64"
 $created += $x64 -match "created"
 try {
-    $service = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]"6D6C7D5F-3B7F-4F0E-9A2C-417261736F01"))
+    $service = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]"8B4F5812-54E9-4A07-887F-51BB2264B601"))
     $own = (Get-Process -Id $PID).Modules | Where-Object { $_.ModuleName -like "ArasoTip*.dll" } | ForEach-Object FileName
     Write-Host "text service in this $([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture) process: created, $($own -join ', ')"
     [Runtime.InteropServices.Marshal]::ReleaseComObject($service) | Out-Null
@@ -310,21 +310,7 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Shot "4-resumed" $f.window 60
     Stop-Process -Id $f.process.Id -Force
 
-    # Japanese on, for kana and the kanji candidates (the host reads settings.json as it starts).
-    $settings = Join-Path $env:APPDATA "Araso\settings.json"
-    New-Item -ItemType Directory -Force (Split-Path $settings) | Out-Null
-    [IO.File]::WriteAllText($settings, '{ "japanese": true, "liveConversion": false }')
-    Get-Process ArasoHost -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Process -FilePath "$folder\ArasoHost.exe" -ArgumentList "--server"
-    Start-Sleep -Seconds 8
-    $f = Kept "wpf"
-    Send-Keys "kyouhaiitenki"; Start-Sleep -Milliseconds 700
-    Shot "5-japanese-kana" $f.window 40
-    Send-Keys " "; Start-Sleep -Milliseconds 900
-    Shot "6-kanji-conversion" $f.window 320
-    Send-Keys " "; Start-Sleep -Milliseconds 700
-    Shot "7-kanji-candidates" $f.window 320
-    Stop-Process -Id $f.process.Id -Force
+    # (No Japanese in this build: its kanji dictionary isn't installed.)
 
     # The settings window, every tab; Try Typing with a few words in it.
     foreach ($tab in "general", "keys", "apps", "learning", "about") {
@@ -339,30 +325,21 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Send-Keys "dkssud hello kyouha "; Start-Sleep -Milliseconds 900
     Shot "settings-typing" $f.window
     Stop-Process -Id $f.process.Id -Force
-    Remove-Item $settings -ErrorAction SilentlyContinue
-    Get-Process ArasoHost -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Process -FilePath "$folder\ArasoHost.exe" -ArgumentList "--server"
-    Start-Sleep -Seconds 8
 
-    # Reported, not required: Araso listed under Japanese and English, where a classic app may keep
-    # a whole word composed in the text (it keeps a Korean input method to one syllable at a time).
-    foreach ($other in @(@("0411", "04"), @("0409", "05"))) {
-        $otherTip = "$($other[0]):{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}{6D6C7D5F-3B7F-4F0E-9A2C-417261736F$($other[1])}"
-        [Keys]::InstallLayoutOrTip($otherTip, 0) | Out-Null
-        Set-WinDefaultInputMethodOverride -InputTip $otherTip
-        $script:language = $other[0]
-        Case "dkssud hello " "안녕 hello " $null $classic | Out-Null
-        Case "gksrmf " "한글 " $null $classic | Out-Null
-        $f = Kept $classic
-        Send-Keys "gksrmf dkssud"; Start-Sleep -Milliseconds 700
-        Shot "8-classic-app-$($other[0])-composing" $f.window 40
-        Stop-Process -Id $f.process.Id -Force
-    }
+    # The readings strip under a word switched with right Alt.
+    $f = Kept "wpf"
+    Send-Keys "hello"; Tap 0x38; Start-Sleep -Milliseconds 500
+    Shot "9-readings-strip" $f.window 90
+    Stop-Process -Id $f.process.Id -Force
+    $f = Kept $classic
+    Send-Keys "hello"; Tap 0x38; Start-Sleep -Milliseconds 500
+    Shot "9-readings-strip-classic" $f.window 90
+    Stop-Process -Id $f.process.Id -Force
 }
 
 if (Test-Path $log) { Write-Host "--- araso.log"; Get-Content $log | Select-String -NotMatch "scan code" | Select-Object -Last 400 | Out-Host }
-reg query "HKCU\Software\Microsoft\CTF\TIP" /s 2>$null | Select-String -Pattern "6D6C7D5F" | Out-Host
-reg query "HKLM\Software\Microsoft\CTF\TIP\{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}" /s 2>$null | Select-Object -First 20 | Out-Host
+reg query "HKCU\Software\Microsoft\CTF\TIP" /s 2>$null | Select-String -Pattern "8B4F5812" | Out-Host
+reg query "HKLM\Software\Microsoft\CTF\TIP\{8B4F5812-54E9-4A07-887F-51BB2264B601}" /s 2>$null | Select-Object -First 20 | Out-Host
 Get-WinUserLanguageList | Format-List | Out-Host
 if ($created -contains $false) { throw "the text service couldn't be created" }
 if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64" -and -not ($results -contains $true)) {

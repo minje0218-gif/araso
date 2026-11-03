@@ -83,7 +83,7 @@ bool RegisterServer() {
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, path.c_str(), 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
         return false;
     }
-    SetValue(key, nullptr, L"Araso");
+    SetValue(key, nullptr, L"Hanyeong");
     HKEY server = nullptr;
     bool ok = RegCreateKeyExW(key, L"InprocServer32", 0, nullptr, 0, KEY_WRITE, nullptr, &server, nullptr) == ERROR_SUCCESS;
     if (ok) {
@@ -111,7 +111,7 @@ const GUID *const kCategories[] = {
 
 bool RegisterProfile() {
     std::wstring icon = ModulePath();
-    std::wstring name = L"Araso";
+    std::wstring name = L"Hanyeong";
     ITfInputProcessorProfileMgr *profiles = nullptr;
     HRESULT hr = CoCreateInstance(kClsidTfInputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER,
                                   kIID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&profiles));

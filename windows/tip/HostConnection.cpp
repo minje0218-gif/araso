@@ -43,6 +43,17 @@ void HostConnection::LaunchHost() {
     DWORD now = GetTickCount();
     if (lastLaunch_ && now - lastLaunch_ < 10000) return;
     lastLaunch_ = now;
+    // Not from an elevated app (Setup's own window): a host it started runs elevated, and the next
+    // install can neither stop nor replace it.
+    HANDLE token = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        TOKEN_ELEVATION elevation = {};
+        DWORD size = 0;
+        bool elevated = GetTokenInformation(token, TokenElevation, &elevation, sizeof elevation, &size) &&
+                        elevation.TokenIsElevated;
+        CloseHandle(token);
+        if (elevated) return;
+    }
     wchar_t path[MAX_PATH] = L"";
     GetModuleFileNameW(g_instance, path, MAX_PATH);
     std::wstring folder = path;

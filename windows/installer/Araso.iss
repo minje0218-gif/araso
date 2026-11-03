@@ -12,15 +12,13 @@
 #endif
 
 [Setup]
-AppId={{6D6C7D5F-3B7F-4F0E-9A2C-417261736F00}
-AppName=Araso
+AppId={{8B4F5812-54E9-4A07-887F-51BB2264B600}
+AppName=Hanyeong
 AppVersion={#Version}
-AppVerName=Araso {#Version}
-AppPublisher=nytta studio
-AppPublisherURL=https://nyttastudio.com/araso/
-AppSupportURL=https://github.com/nyttastudio/araso/issues
-AppUpdatesURL=https://github.com/nyttastudio/araso/releases
-DefaultDirName={autopf}\Araso
+AppVerName=Hanyeong {#Version}
+AppPublisher=minje0218-gif (from nytta studio's Araso)
+AppPublisherURL=https://github.com/minje0218-gif/araso
+DefaultDirName={autopf}\Hanyeong
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
@@ -44,17 +42,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
 #if FileExists(AddBackslash(CompilerPath) + "Languages\Korean.isl")
-korean.DeleteData=설정과 학습한 단어도 지울까요?%n(%APPDATA%\Araso)
-korean.AddedNote=Araso를 입력기 목록에 추가했습니다. 작업 표시줄의 입력 표시기(한/영 옆)에서 Araso를 고르세요.
+korean.DeleteData=설정과 학습한 단어도 지울까요?%n(%APPDATA%\Hanyeong)
+korean.AddedNote=Hanyeong을 입력기 목록에 추가했습니다. 작업 표시줄의 입력 표시기(ENG)에서 Hanyeong을 고르세요.
 #endif
-english.DeleteData=Also delete settings and learned words?%n(%APPDATA%\Araso)
-english.AddedNote=Araso was added to your input methods. Pick it in the taskbar's input indicator.
+english.DeleteData=Also delete settings and learned words?%n(%APPDATA%\Hanyeong)
+english.AddedNote=Hanyeong was added to your input methods. Pick it in the taskbar's input indicator (ENG).
 
 [Files]
 ; The host and the Swift core it loads, with the Swift runtime beside them.
 Source: "{#Stage}\ArasoHost.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Stage}\*.dll"; Excludes: "ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#Stage}\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs
+Source: "{#Stage}\Resources\*"; Excludes: "Dictionary"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs
 ; The text service, loaded into every app: one per architecture. A copy in use is replaced at the
 ; next restart.
 Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
@@ -62,11 +60,10 @@ Source: "{#Stage}\x86\ArasoTip.dll"; DestDir: "{app}\x86"; Flags: ignoreversion 
 ; ARM64: ArasoTip.dll is an ARM64X forwarder to ArasoTipArm64.dll (ARM64 apps) and ArasoTipX64.dll
 ; (x64 apps under emulation), which share the one registration.
 Source: "{#Stage}\arm64\*.dll"; DestDir: "{app}\arm64"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: IsArm64
-Source: "{#Stage}\vim\*"; DestDir: "{app}\vim"; Flags: ignoreversion
 
 [Registry]
 ; The host starts at sign-in for every user.
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Araso"; ValueData: """{app}\ArasoHost.exe"" --server"; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Hanyeong"; ValueData: """{app}\ArasoHost.exe"" --server"; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\arm64\ArasoTip.dll"""; Flags: runhidden waituntilterminated; Check: IsArm64
@@ -106,5 +103,5 @@ begin
     StopHost();
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent() then
     if MsgBox(CustomMessage('DeleteData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-      DelTree(ExpandConstant('{userappdata}\Araso'), True, True, True);
+      DelTree(ExpandConstant('{userappdata}\Hanyeong'), True, True, True);
 end;
