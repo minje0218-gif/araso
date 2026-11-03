@@ -100,7 +100,7 @@ $setup = Start-Process -FilePath $Installer -ArgumentList "/VERYSILENT", "/SUPPR
 $setup.WaitForExit()
 if ($setup.ExitCode -ne 0) { throw "install failed ($($setup.ExitCode))" }
 Write-Host "installed"
-$folder = "$env:ProgramFiles\Araso"
+$folder = "$env:ProgramFiles\Hanyeong"
 if (-not (Test-Path "$folder\ArasoTip.dll")) { throw "not installed in $folder" }
 [Keys]::InstallLayoutOrTip($tip, 0) | Out-Null
 if (-not [Keys]::SetDefaultLayoutOrTip($tip, 0)) { Write-Host "SetDefaultLayoutOrTip failed" }
@@ -348,7 +348,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64" -and -not ($results -contains $true)
     exit 0
 }
 if ($results -contains $false) {
-    Get-ChildItem "$env:APPDATA\Araso" -ErrorAction SilentlyContinue | Select-Object Name | Out-Host
+    Get-ChildItem "$env:APPDATA\Hanyeong" -ErrorAction SilentlyContinue | Select-Object Name | Out-Host
     throw "typing test failed"
 }
 Write-Host "typing test: ok"
