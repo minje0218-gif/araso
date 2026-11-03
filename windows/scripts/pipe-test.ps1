@@ -68,7 +68,7 @@ try {
     Write-Host "pipe test: the settings model says version '$($model.settings.version)'"
     if ($Version -and $model.settings.version -ne $Version) { throw "the host says version '$($model.settings.version)', not $Version" }
     $menu = Send @{ op = "menu"; client = $client }
-    if (-not ($menu.reply.menu | Where-Object { $_.id -eq "settings" })) { throw "no menu" }
+    if (-not ($menu.reply.menu | Where-Object { $_.id -eq "pause" })) { throw "no menu" }
     Send @{ op = "detach"; client = $client } | Out-Null
     $pipe.Dispose()
     Write-Host "pipe test: ok ($script:text)"
