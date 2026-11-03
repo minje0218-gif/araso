@@ -59,6 +59,9 @@ Json RectJson(const RECT &rect) {
     return out;
 }
 
+/// The text service of this thread, for its keyboard hook.
+thread_local TextService *t_service = nullptr;
+
 template <typename T> void SafeRelease(T *&pointer) {
     if (pointer) {
         pointer->Release();
@@ -161,6 +164,8 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr *threadMgr, TfClientId clientI
         compartments->Release();
     }
     host_.Attach(app_, window_);
+    t_service = this;
+    keyboardHook_ = SetWindowsHookExW(WH_KEYBOARD, KeyboardHook, nullptr, GetCurrentThreadId());
     Log("activated in %s", Utf8(app_).c_str());
     return S_OK;
 }
@@ -169,6 +174,9 @@ STDMETHODIMP TextService::Deactivate() {
     if (composition_ && compositionContext_) CommitIn(compositionContext_, "blur");
     else if (!floating_.empty() && floatingContext_) CommitIn(floatingContext_, "blur");
     host_.Detach();
+    if (keyboardHook_) UnhookWindowsHookEx(keyboardHook_);
+    keyboardHook_ = nullptr;
+    if (t_service == this) t_service = nullptr;
     if (button_) {
         ITfLangBarItemMgr *items = nullptr;
         if (threadMgr_ && SUCCEEDED(threadMgr_->QueryInterface(kIID_ITfLangBarItemMgr, reinterpret_cast<void **>(&items)))) {
@@ -302,6 +310,53 @@ void TextService::SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam)
     if (FAILED(hr)) context->Release();
 }
 
+LRESULT CALLBACK TextService::KeyboardHook(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION && t_service && t_service->RightAlt(wParam, lParam)) return 1;
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+/// A key as the app's thread reads it: right Alt going down is told to the host as a modifier, and
+/// going up after nothing else was pressed, a tap the host takes (a switch) is handled and kept
+/// from the app, which would open its menu bar. Any other key only ends the tap.
+bool TextService::RightAlt(WPARAM vk, LPARAM lParam) {
+    bool up = (lParam & (1u << 31)) != 0;
+    if (vk != VK_MENU || !(lParam & (1 << 24))) {
+        if (!up) rightAltAlone_ = false;
+        return false;
+    }
+    ITfContext *context = FocusedContext();
+    if (!context) return false;
+    bool kept = false;
+    if (!up) {
+        if (!(lParam & (1 << 30))) rightAltAlone_ = true; // not the key repeating
+        SeeModifier(context, vk, lParam);
+    } else if (rightAltAlone_) {
+        rightAltAlone_ = false;
+        kept = HostTakes(vk, lParam, true);
+        asked_.valid = false;
+        if (kept) {
+            rightAltUp_ = lParam;
+            Json key = KeyJson(vk, lParam);
+            context->AddRef();
+            HRESULT hr = Edit(context, false, [this, context, key](TfEditCookie cookie) {
+                bool masked = false;
+                Json request = Json::object();
+                request.set("op", "keyUp");
+                request.set("key", key);
+                request.set("context", Snapshot(cookie, context, masked));
+                request.set("rects", Rects(cookie, context));
+                bool handled = false;
+                Exchange(cookie, context, request, handled);
+                context->Release();
+                return S_OK;
+            });
+            if (FAILED(hr)) context->Release();
+        }
+    }
+    context->Release();
+    return kept;
+}
+
 STDMETHODIMP TextService::OnTestKeyDown(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
     if (!Takes(wParam, true) || replayed_.Is(wParam, 0)) return S_OK;
@@ -336,6 +391,10 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM l
 }
 
 STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
+    if (wParam == VK_MENU && rightAltUp_ && lParam == rightAltUp_) {
+        *eaten = TRUE; // the keyboard hook's already
+        return S_OK;
+    }
     if (keptDown_[wParam & 0xFF]) {
         *eaten = TRUE;
         return S_OK;
@@ -346,6 +405,11 @@ STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam
 
 STDMETHODIMP TextService::OnKeyUp(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
+    if (wParam == VK_MENU && rightAltUp_ && lParam == rightAltUp_) {
+        rightAltUp_ = 0;
+        *eaten = TRUE;
+        return S_OK;
+    }
     if (keptDown_[wParam & 0xFF]) {
         keptDown_[wParam & 0xFF] = false;
         *eaten = TRUE;

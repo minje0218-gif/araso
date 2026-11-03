@@ -114,6 +114,14 @@ private:
     bool Takes(WPARAM wParam, bool down) const;
     bool HostTakes(WPARAM wParam, LPARAM lParam, bool up);
     void SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam);
+
+    /// Right Alt, listed under English: Alt, which TSF hands no text service, so a thread keyboard
+    /// hook sees it (`RightAlt`). Its tap switches the word, as 한/영 does on a Korean keyboard.
+    HHOOK keyboardHook_ = nullptr;
+    bool rightAltAlone_ = false;
+    LPARAM rightAltUp_ = 0; // the release the hook handled, so the key sink doesn't again
+    static LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam);
+    bool RightAlt(WPARAM vk, LPARAM lParam);
     void HandleKey(ITfContext *context, WPARAM wParam, LPARAM lParam, const char *op, BOOL *eaten);
     void Replay(WPARAM wParam, LPARAM lParam);
     Json KeyJson(WPARAM wParam, LPARAM lParam) const;
