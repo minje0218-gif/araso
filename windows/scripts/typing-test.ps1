@@ -328,12 +328,12 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
 
     # The readings strip under a word switched with right Alt.
     $f = Kept "wpf"
-    Send-Keys "hello"; Tap 0x38; Start-Sleep -Milliseconds 500
-    Shot "9-readings-strip" $f.window 90
+    Send-Keys "githubdp"; Tap 0x38; Start-Sleep -Milliseconds 500
+    Shot "9-readings-strip" $f.window 130
     Stop-Process -Id $f.process.Id -Force
     $f = Kept $classic
     Send-Keys "hello"; Tap 0x38; Start-Sleep -Milliseconds 500
-    Shot "9-readings-strip-classic" $f.window 90
+    Shot "9-readings-strip-classic" $f.window 130
     Stop-Process -Id $f.process.Id -Force
 }
 

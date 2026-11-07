@@ -50,3 +50,8 @@
 "Removes Araso from this PC. The uninstaller asks whether to delete settings and learned words too." = "이 PC에서 Araso를 지웁니다. 설정과 학습한 단어도 지울지는 제거 프로그램이 묻습니다.";
 "Araso isn't installed here, so it can't be uninstalled from this window." = "이 위치에 설치된 Araso가 아니어서 여기서는 제거할 수 없습니다.";
 "Araso Settings" = "Araso 설정";
+
+/* 후보 띠의 언어 이름 */
+"EN" = "영어";
+"KO" = "한국어";
+"MIX" = "영어+조사";

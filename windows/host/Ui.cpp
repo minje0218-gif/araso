@@ -430,6 +430,18 @@ const wchar_t *kLearnedClass = L"ArasoLearned";
 constexpr UINT_PTR kFrameTimer = 7;
 }
 
+namespace {
+/// `a` over `b`, `percent` of it showing.
+COLORREF Mix(COLORREF a, COLORREF b, int percent) {
+    auto channel = [percent](int x, int y) { return (x * percent + y * (100 - percent)) / 100; };
+    return RGB(channel(GetRValue(a), GetRValue(b)), channel(GetGValue(a), GetGValue(b)),
+               channel(GetBValue(a), GetBValue(b)));
+}
+}  // namespace
+
+// The card: one row per reading, the text on the left and its language on the right in small
+// gray; the reading on screen on an accent tint with a check before it. A dot before the language
+// marks the reading the keys go in as when left alone; a ring, one corrected once.
 void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, int once, const RECT &anchor) {
     if (rows.empty() || anchor.bottom <= anchor.top) return Hide();
     RegisterOnce(kReadingsClass, Proc, true);
@@ -441,28 +453,31 @@ void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, 
     once_ = once;
     dpi_ = ui::DpiAt(anchor);
     HDC screen = GetDC(nullptr);
-    HFONT font = ui::Font(dpi_, 100), bold = ui::Font(dpi_, 80, true);
-    HGDIOBJ old = SelectObject(screen, bold);
-    int tags = 0, texts = 0;
-    for (const auto &row : rows_) {
-        SIZE extent = {};
-        GetTextExtentPoint32W(screen, row.tag.c_str(), static_cast<int>(row.tag.size()), &extent);
-        tags = std::max(tags, static_cast<int>(extent.cx));
-    }
-    SelectObject(screen, font);
+    HFONT font = ui::Font(dpi_, 100), small = ui::Font(dpi_, 80);
+    HGDIOBJ old = SelectObject(screen, font);
+    int texts = 0, tags = 0;
     for (const auto &row : rows_) {
         SIZE extent = {};
         GetTextExtentPoint32W(screen, row.text.c_str(), static_cast<int>(row.text.size()), &extent);
         texts = std::max(texts, static_cast<int>(extent.cx));
     }
+    SelectObject(screen, small);
+    for (const auto &row : rows_) {
+        SIZE extent = {};
+        GetTextExtentPoint32W(screen, row.tag.c_str(), static_cast<int>(row.tag.size()), &extent);
+        tags = std::max(tags, static_cast<int>(extent.cx));
+    }
     SelectObject(screen, old);
     DeleteObject(font);
-    DeleteObject(bold);
+    DeleteObject(small);
     ReleaseDC(nullptr, screen);
-    tagWidth_ = tags + ui::Scale(10, dpi_);
-    int width = std::max(ui::Scale(96, dpi_), ui::Scale(14, dpi_) + tagWidth_ + texts + ui::Scale(16, dpi_));
-    SIZE size = {width, static_cast<LONG>(rows_.size()) * ui::Scale(24, dpi_) + ui::Scale(6, dpi_)};
-    POINT origin = Place(anchor, size, ui::Scale(4, dpi_));
+    tagWidth_ = tags;
+    // Card padding, row sides, the check's column, text to language, the marker's column.
+    int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
+        gap = ui::Scale(20, dpi_), dot = ui::Scale(10, dpi_);
+    int width = std::max(ui::Scale(150, dpi_), 2 * pad + 2 * side + check + texts + gap + dot + tags);
+    SIZE size = {width, static_cast<LONG>(rows_.size()) * ui::Scale(30, dpi_) + 2 * pad};
+    POINT origin = Place(anchor, size, ui::Scale(6, dpi_));
     SetWindowPos(window_, HWND_TOPMOST, origin.x, origin.y, size.cx, size.cy, SWP_NOACTIVATE | SWP_SHOWWINDOW);
     InvalidateRect(window_, nullptr, FALSE);
 }
@@ -482,44 +497,55 @@ void ReadingsWindow::Paint(HDC target) {
     HBRUSH background = CreateSolidBrush(theme.background);
     FillRect(dc, &client, background);
     DeleteObject(background);
-    HFONT font = ui::Font(dpi_, 100), tagFont = ui::Font(dpi_, 80), pillFont = ui::Font(dpi_, 80, true);
+    HFONT font = ui::Font(dpi_, 100), small = ui::Font(dpi_, 80);
     SetBkMode(dc, TRANSPARENT);
-    int inset = ui::Scale(3, dpi_), rowHeight = ui::Scale(24, dpi_);
+    int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
+        dot = ui::Scale(10, dpi_), rowHeight = ui::Scale(30, dpi_);
+    COLORREF tint = Mix(theme.accent, theme.background, theme.dark ? 35 : 16);
     for (int k = 0; k < static_cast<int>(rows_.size()); k++) {
-        RECT row = {inset, inset + k * rowHeight, client.right - inset, inset + (k + 1) * rowHeight};
+        RECT row = {pad, pad + k * rowHeight, client.right - pad, pad + (k + 1) * rowHeight};
         bool on = k == selected_;
-        if (on) ui::FillRounded(dc, row, ui::Scale(5, dpi_), theme.accent);
-        RECT tag = {row.left + ui::Scale(6, dpi_), row.top + (rowHeight - ui::Scale(16, dpi_)) / 2,
-                    row.left + ui::Scale(6, dpi_) + tagWidth_, row.top + (rowHeight + ui::Scale(16, dpi_)) / 2};
-        COLORREF tagInk = on ? theme.accentText : theme.secondary;
-        if (k == pick_) {
-            // The pill takes the ink, and the tag turns to what's under it.
-            ui::FillRounded(dc, tag, ui::Scale(4, dpi_), on ? theme.accentText : theme.accent);
-            tagInk = on ? theme.accent : theme.accentText;
-        } else if (k == once_) {
-            Gdiplus::Graphics graphics(dc);
-            graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-            Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(tagInk), GetGValue(tagInk), GetBValue(tagInk)),
-                             static_cast<float>(ui::Scale(13, dpi_)) / 10);
-            pen.SetDashStyle(Gdiplus::DashStyleDot);
-            graphics.DrawRectangle(&pen, static_cast<float>(tag.left), static_cast<float>(tag.top),
-                                   static_cast<float>(tag.right - tag.left), static_cast<float>(tag.bottom - tag.top));
+        if (on) ui::FillRounded(dc, row, ui::Scale(6, dpi_), tint);
+        Gdiplus::Graphics graphics(dc);
+        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        float middle = (row.top + row.bottom) / 2.0f;
+        if (on) {
+            Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(theme.accent), GetGValue(theme.accent), GetBValue(theme.accent)),
+                             static_cast<float>(ui::Scale(18, dpi_)) / 10);
+            pen.SetStartCap(Gdiplus::LineCapRound);
+            pen.SetEndCap(Gdiplus::LineCapRound);
+            pen.SetLineJoin(Gdiplus::LineJoinRound);
+            float x = static_cast<float>(row.left + side), u = static_cast<float>(ui::Scale(10, dpi_)) / 10;
+            Gdiplus::PointF points[] = {{x, middle}, {x + 3.5f * u, middle + 3.5f * u}, {x + 10 * u, middle - 4 * u}};
+            graphics.DrawLines(&pen, points, 3);
         }
-        SelectObject(dc, k == pick_ ? pillFont : tagFont);
-        SetTextColor(dc, tagInk);
-        DrawTextW(dc, rows_[k].tag.c_str(), -1, &tag, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_NOPREFIX);
-        RECT text = row;
-        text.left = tag.right + ui::Scale(6, dpi_);
+        RECT tag = {row.right - side - tagWidth_, row.top, row.right - side, row.bottom};
+        if (k == pick_ || k == once_) {
+            float r = static_cast<float>(ui::Scale(30, dpi_)) / 10;
+            float cx = static_cast<float>(tag.left - dot / 2);
+            COLORREF ink = k == pick_ ? theme.accent : theme.secondary;
+            Gdiplus::Color color(255, GetRValue(ink), GetGValue(ink), GetBValue(ink));
+            if (k == pick_) {
+                Gdiplus::SolidBrush brush(color);
+                graphics.FillEllipse(&brush, cx - r, middle - r, 2 * r, 2 * r);
+            } else {
+                Gdiplus::Pen ring(color, static_cast<float>(ui::Scale(12, dpi_)) / 10);
+                graphics.DrawEllipse(&ring, cx - r, middle - r, 2 * r, 2 * r);
+            }
+        }
+        SelectObject(dc, small);
+        SetTextColor(dc, on ? theme.text : theme.secondary);
+        DrawTextW(dc, rows_[k].tag.c_str(), -1, &tag, DT_SINGLELINE | DT_VCENTER | DT_RIGHT | DT_NOPREFIX);
+        RECT text = {row.left + side + check, row.top, tag.left - dot - ui::Scale(4, dpi_), row.bottom};
         SelectObject(dc, font);
-        SetTextColor(dc, on ? theme.accentText : theme.text);
+        SetTextColor(dc, theme.text);
         DrawTextW(dc, rows_[k].text.c_str(), -1, &text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
     }
     BitBlt(target, 0, 0, client.right, client.bottom, dc, 0, 0, SRCCOPY);
     SelectObject(dc, oldBitmap);
     DeleteObject(bitmap);
     DeleteObject(font);
-    DeleteObject(tagFont);
-    DeleteObject(pillFont);
+    DeleteObject(small);
     DeleteDC(dc);
 }
 

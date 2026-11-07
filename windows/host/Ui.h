@@ -57,8 +57,8 @@ private:
 };
 
 /// The readings a switch key just went through (ReadingsHUD on macOS): a list under the word, each
-/// reading with its language tag, the one on screen highlighted; a filled pill on the tag of the
-/// reading the keys go in as when left alone, a dotted ring on one corrected once.
+/// reading and its language, the one on screen on an accent tint with a check; a dot by the language
+/// of the reading the keys go in as when left alone, a ring by one corrected once.
 class ReadingsWindow {
 public:
     struct Row {
