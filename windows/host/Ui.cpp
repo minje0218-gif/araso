@@ -439,7 +439,7 @@ COLORREF Mix(COLORREF a, COLORREF b, int percent) {
 }
 }  // namespace
 
-// The card: one row per reading, the text on the left and its language on the right in small
+// The card: one row per reading, the text on the left and its language on the right in labelFont
 // gray; the reading on screen on an accent tint with a check before it. A dot before the language
 // marks the reading the keys go in as when left alone; a ring, one corrected once.
 void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, int once, const RECT &anchor) {
@@ -453,7 +453,7 @@ void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, 
     once_ = once;
     dpi_ = ui::DpiAt(anchor);
     HDC screen = GetDC(nullptr);
-    HFONT font = ui::Font(dpi_, 100), small = ui::Font(dpi_, 80);
+    HFONT font = ui::Font(dpi_, 100), labelFont = ui::Font(dpi_, 80);
     HGDIOBJ old = SelectObject(screen, font);
     int texts = 0, tags = 0;
     for (const auto &row : rows_) {
@@ -461,7 +461,7 @@ void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, 
         GetTextExtentPoint32W(screen, row.text.c_str(), static_cast<int>(row.text.size()), &extent);
         texts = std::max(texts, static_cast<int>(extent.cx));
     }
-    SelectObject(screen, small);
+    SelectObject(screen, labelFont);
     for (const auto &row : rows_) {
         SIZE extent = {};
         GetTextExtentPoint32W(screen, row.tag.c_str(), static_cast<int>(row.tag.size()), &extent);
@@ -469,7 +469,7 @@ void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, 
     }
     SelectObject(screen, old);
     DeleteObject(font);
-    DeleteObject(small);
+    DeleteObject(labelFont);
     ReleaseDC(nullptr, screen);
     tagWidth_ = tags;
     // Card padding, row sides, the check's column, text to language, the marker's column.
@@ -497,7 +497,7 @@ void ReadingsWindow::Paint(HDC target) {
     HBRUSH background = CreateSolidBrush(theme.background);
     FillRect(dc, &client, background);
     DeleteObject(background);
-    HFONT font = ui::Font(dpi_, 100), small = ui::Font(dpi_, 80);
+    HFONT font = ui::Font(dpi_, 100), labelFont = ui::Font(dpi_, 80);
     SetBkMode(dc, TRANSPARENT);
     int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
         dot = ui::Scale(10, dpi_), rowHeight = ui::Scale(30, dpi_);
@@ -533,7 +533,7 @@ void ReadingsWindow::Paint(HDC target) {
                 graphics.DrawEllipse(&ring, cx - r, middle - r, 2 * r, 2 * r);
             }
         }
-        SelectObject(dc, small);
+        SelectObject(dc, labelFont);
         SetTextColor(dc, on ? theme.text : theme.secondary);
         DrawTextW(dc, rows_[k].tag.c_str(), -1, &tag, DT_SINGLELINE | DT_VCENTER | DT_RIGHT | DT_NOPREFIX);
         RECT text = {row.left + side + check, row.top, tag.left - dot - ui::Scale(4, dpi_), row.bottom};
@@ -545,7 +545,7 @@ void ReadingsWindow::Paint(HDC target) {
     SelectObject(dc, oldBitmap);
     DeleteObject(bitmap);
     DeleteObject(font);
-    DeleteObject(small);
+    DeleteObject(labelFont);
     DeleteDC(dc);
 }
 
