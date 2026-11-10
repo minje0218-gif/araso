@@ -501,6 +501,8 @@ void ReadingsWindow::Paint(HDC target) {
     SetBkMode(dc, TRANSPARENT);
     int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
         dot = ui::Scale(14, dpi_), rowHeight = ui::Scale(30, dpi_);
+    // Blue, whatever the system's accent color.
+    theme.accent = theme.dark ? RGB(96, 165, 250) : RGB(37, 99, 235);
     COLORREF tint = Mix(theme.accent, theme.background, theme.dark ? 35 : 16);
     for (int k = 0; k < static_cast<int>(rows_.size()); k++) {
         RECT row = {pad, pad + k * rowHeight, client.right - pad, pad + (k + 1) * rowHeight};
