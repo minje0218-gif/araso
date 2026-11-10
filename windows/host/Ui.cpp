@@ -439,7 +439,7 @@ COLORREF Mix(COLORREF a, COLORREF b, int percent) {
 }
 }  // namespace
 
-// The card: one row per reading, the text on the left and its language on the right in labelFont
+// The card: one row per reading, the text on the left and its language on the right in small
 // gray; the reading on screen on an accent tint with a check before it. A dot before the language
 // marks the reading the keys go in as when left alone; a ring, one corrected once.
 void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, int once, const RECT &anchor) {
@@ -474,7 +474,7 @@ void ReadingsWindow::Show(const std::vector<Row> &rows, int selected, int pick, 
     tagWidth_ = tags;
     // Card padding, row sides, the check's column, text to language, the marker's column.
     int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
-        gap = ui::Scale(20, dpi_), dot = ui::Scale(10, dpi_);
+        gap = ui::Scale(20, dpi_), dot = ui::Scale(14, dpi_);
     int width = std::max(ui::Scale(150, dpi_), 2 * pad + 2 * side + check + texts + gap + dot + tags);
     SIZE size = {width, static_cast<LONG>(rows_.size()) * ui::Scale(30, dpi_) + 2 * pad};
     POINT origin = Place(anchor, size, ui::Scale(6, dpi_));
@@ -500,7 +500,7 @@ void ReadingsWindow::Paint(HDC target) {
     HFONT font = ui::Font(dpi_, 100), labelFont = ui::Font(dpi_, 80);
     SetBkMode(dc, TRANSPARENT);
     int pad = ui::Scale(4, dpi_), side = ui::Scale(10, dpi_), check = ui::Scale(20, dpi_),
-        dot = ui::Scale(10, dpi_), rowHeight = ui::Scale(30, dpi_);
+        dot = ui::Scale(14, dpi_), rowHeight = ui::Scale(30, dpi_);
     COLORREF tint = Mix(theme.accent, theme.background, theme.dark ? 35 : 16);
     for (int k = 0; k < static_cast<int>(rows_.size()); k++) {
         RECT row = {pad, pad + k * rowHeight, client.right - pad, pad + (k + 1) * rowHeight};
@@ -522,7 +522,7 @@ void ReadingsWindow::Paint(HDC target) {
         RECT tag = {row.right - side - tagWidth_, row.top, row.right - side, row.bottom};
         if (k == pick_ || k == once_) {
             float r = static_cast<float>(ui::Scale(30, dpi_)) / 10;
-            float cx = static_cast<float>(tag.left - dot / 2);
+            float cx = static_cast<float>(tag.left - ui::Scale(8, dpi_));
             COLORREF ink = k == pick_ ? theme.accent : theme.secondary;
             Gdiplus::Color color(255, GetRValue(ink), GetGValue(ink), GetBValue(ink));
             if (k == pick_) {
