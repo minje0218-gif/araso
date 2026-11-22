@@ -124,6 +124,9 @@ private:
     bool RightAlt(WPARAM vk, LPARAM lParam);
     void HandleKey(ITfContext *context, WPARAM wParam, LPARAM lParam, const char *op, BOOL *eaten);
     void Replay(WPARAM wParam, LPARAM lParam);
+    /// A Return sent again after a moment (`Replay`).
+    INPUT delayed_ = {};
+    static constexpr UINT_PTR kReplayTimer = 1;
     Json KeyJson(WPARAM wParam, LPARAM lParam) const;
     /// Runs `body` in an edit session on `context`: synchronously when `sync`, else when TSF can.
     HRESULT Edit(ITfContext *context, bool sync, std::function<HRESULT(TfEditCookie)> body);

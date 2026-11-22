@@ -433,6 +433,13 @@ void TextService::Replay(WPARAM wParam, LPARAM lParam) {
     input.ki.wVk = static_cast<WORD>(wParam);
     input.ki.wScan = static_cast<WORD>((lParam >> 16) & 0xFF);
     input.ki.dwFlags = ((lParam >> 24) & 1) ? KEYEVENTF_EXTENDEDKEY : 0;
+    // Return a moment later: Electron apps (Claude's) drop a Return that comes as the composition
+    // ends, taking it for the input method's. Chrome doesn't, so 40 ms is plenty.
+    if (wParam == VK_RETURN && window_) {
+        delayed_ = input;
+        SetTimer(window_, kReplayTimer, 40, nullptr);
+        return;
+    }
     // The key comes back with a repeat count of 1 and no previous state: match it by key only.
     replayed_ = {true, wParam, 0, GetTickCount(), true};
     SendInput(1, &input, sizeof input);
@@ -1093,6 +1100,15 @@ LRESULT CALLBACK TextService::WindowProc(HWND window, UINT message, WPARAM wPara
     if (message == PendingMessage()) {
         auto *service = reinterpret_cast<TextService *>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (service) service->FetchPending();
+        return 0;
+    }
+    if (message == WM_TIMER && wParam == kReplayTimer) {
+        KillTimer(window, kReplayTimer);
+        auto *service = reinterpret_cast<TextService *>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (service) {
+            service->replayed_ = {true, service->delayed_.ki.wVk, 0, GetTickCount(), true};
+            SendInput(1, &service->delayed_, sizeof service->delayed_);
+        }
         return 0;
     }
     return DefWindowProcW(window, message, wParam, lParam);
